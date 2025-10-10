@@ -12,9 +12,11 @@ public class Main {
     private int[] playerPos;
     private int lost = 0;
     private int win = 0;
+    private boolean bombPlaced = false;
+    private int[] bombPos = null;
 
     public Main(int mapSize, String userPosition, String keyPosition,
-                int noVillan, List<String> villanPos,
+                List<String> villanPos,
                 int noBricks, List<String> bricksPos) {
 
         this.mapSize = mapSize;
@@ -97,7 +99,12 @@ public class Main {
     public void printGrid() {
         for (int i = 0; i < mapSize; i++) {
             for (int j = 0; j < mapSize; j++) {
-                System.out.print(grid[i][j] + " ");
+                String display = grid[i][j];
+                // show bomb overlay if planted and not occupying player's cell
+                if (bombPlaced && bombPos != null && bombPos[0] == i && bombPos[1] == j && !Objects.equals(display, "P")) {
+                    display = "O"; // bomb
+                }
+                System.out.print(display + " ");
             }
             System.out.println();
         }
@@ -131,19 +138,70 @@ public class Main {
 
         return true;
     }
-    public int movements (String[][] grid, String user) {
-        String[] moves = {"UP", "DOWN", "RIGHT", "LEFT", "TOP_RIGHT_D", "TOP_LEFT_D", "BOTTOM_RIGHT_D", "BOTTOM_LEFT_D"};
-        for(int i=0; i<8; i++) {
-            System.out.println("Enter " + i + " for the " + moves[i] + " move");
+
+    public void plantBomb() {
+        int x = playerPos[0];
+        int y = playerPos[1];
+        bombPlaced = true;
+        bombPos = new int[]{x, y};
+        System.out.println("Bomb planted at " + (char)(x + 96) + (char)(y + 96));
+    }
+
+    public void detonateBomb() {
+        if (!bombPlaced || bombPos == null) {
+            System.out.println("No bomb to detonate");
+            return;
         }
-        Scanner sc = new Scanner(System.in);
-        int choice = sc.nextInt();
-        int x = Character.toLowerCase(user.charAt(0)) - 96;
-        int y = Character.toLowerCase(user.charAt(1)) - 96;
-        int oldX = x;
-        int oldY = y;
-        System.out.println(x + " " + y);
-        System.out.println(userPosition);
+        int bx = bombPos[0];
+        int by = bombPos[1];
+        System.out.println("Bomb detonated at " + (char)(bx + 96) + (char)(by + 96));
+
+        int[][] affected = {
+                {bx, by},
+                {bx - 1, by},
+                {bx + 1, by},
+                {bx, by - 1},
+                {bx, by + 1}
+        };
+
+        for (int[] cell : affected) {
+            int i = cell[0];
+            int j = cell[1];
+            if (i <= 1 || j <= 1 || i >= mapSize - 1 || j >= mapSize - 1) continue;
+            String content = grid[i][j];
+            if (Objects.equals(content, "P")) {
+                System.out.println("Player was inside blast radius. You Died.");
+                this.lost = 1;
+            } else if (Objects.equals(content, "V")) {
+                System.out.println("Villain at " + (char)(i + 96) + (char)(j + 96) + " killed by blast");
+                grid[i][j] = " ";
+            } else if (Objects.equals(content, "B")) {
+                System.out.println("Brick at " + (char)(i + 96) + (char)(j + 96) + " destroyed by blast");
+                grid[i][j] = " ";
+            } else {
+                grid[i][j] = " ";
+            }
+        }
+        bombPlaced = false;
+        bombPos = null;
+    }
+
+    public int movements (String user) {
+         String[] moves = {"UP", "DOWN", "RIGHT", "LEFT", "TOP_RIGHT_D", "TOP_LEFT_D", "BOTTOM_RIGHT_D", "BOTTOM_LEFT_D", "PLANT_BOMB", "DETONATE_BOMB"};
+         for(int i=0; i<8; i++) {
+             System.out.println("Enter " + i + " for the " + moves[i] + " move");
+         }
+         // print new bomb options
+         System.out.println("Enter 8 for PLANT_BOMB");
+         System.out.println("Enter 9 for DETONATE_BOMB");
+         Scanner sc = new Scanner(System.in);
+         int choice = sc.nextInt();
+         int x = Character.toLowerCase(user.charAt(0)) - 96;
+         int y = Character.toLowerCase(user.charAt(1)) - 96;
+         int oldX = x;
+         int oldY = y;
+         System.out.println(x + " " + y);
+         System.out.println(userPosition);
 
         switch (choice) {
             case 0:
@@ -186,6 +244,12 @@ public class Main {
                     y -= 1;
                 }
                 break;
+            case 8:
+                plantBomb();
+                break;
+            case 9:
+                detonateBomb();
+                break;
             default:
                 System.out.println("Invalid choice");
         }
@@ -195,6 +259,7 @@ public class Main {
             this.grid[oldX][oldY] = " ";
             this.grid[x][y] = "P";
             this.userPosition = String.valueOf((char)(x + 96)) + (char)(y + 96);
+            this.playerPos = new int[]{x, y};
             oldY = y;
             oldX = x;
         }
@@ -210,20 +275,16 @@ public class Main {
 
 
     public static void main(String[] args) {
-//        you can plant a bomb and detonate ,
-//        if the bomb is detonated damage range is 1 cell ( 4direction ) ,
-//        if u are in that possition u’ll die ,
-//        so detonate bomb when u are not within the range
         List<String> villains = Arrays.asList("BH", "DF");
         List<String> bricks = Arrays.asList("DD", "ED", "FB", "FF", "GB", "HD");
 
-        Main s = new Main(12, "CB", "FD", 2, villains, 6, bricks);
+        Main s = new Main(12, "CB", "FD", villains, 6, bricks);
         String [][] grid = s.constructGrid();
         s.printGrid();
         int move = 1;
         while(move != 0) {
             String user = s.userPosition;
-            move = s.movements(grid, user);
+            move = s.movements(user);
         }
     }
 
